@@ -7,6 +7,8 @@ pub struct TxnRow {
     pub memo: String,
     pub amount_str: String,
     pub raw_amount: Decimal,
+    pub running_balance_str: String,
+    pub raw_running_balance: Decimal,
     pub fit_id: String,
     pub server_txn_id: Option<String>,
     pub check_number: Option<String>,

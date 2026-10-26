@@ -13,6 +13,7 @@ pub fn view_table<'a>(acct: &'a AccountView, expanded: Option<usize>) -> Element
     let w_name = Fill;
     let w_memo = Fill;
     let w_amt: f32 = 100.0;
+    let w_bal: f32 = 100.0;
 
     let header = container(
         row![
@@ -27,6 +28,14 @@ pub fn view_table<'a>(acct: &'a AccountView, expanded: Option<usize>) -> Element
                     .align_x(Horizontal::Right),
             )
             .width(w_amt)
+            .align_x(Horizontal::Right),
+            container(
+                text("Balance")
+                    .size(10)
+                    .font(BOLD)
+                    .align_x(Horizontal::Right),
+            )
+            .width(w_bal)
             .align_x(Horizontal::Right),
         ]
         .spacing(6)
@@ -60,6 +69,12 @@ pub fn view_table<'a>(acct: &'a AccountView, expanded: Option<usize>) -> Element
                     color!(0x34c759)
                 };
 
+                let bal_color = if txn.raw_running_balance.is_sign_negative() {
+                    color!(0xff3b30)
+                } else {
+                    color!(0x1d1d1f)
+                };
+
                 let main_row = button(
                     row![
                         text(&txn.date).size(11).width(w_date),
@@ -79,6 +94,14 @@ pub fn view_table<'a>(acct: &'a AccountView, expanded: Option<usize>) -> Element
                                 .align_x(Horizontal::Right),
                         )
                         .width(w_amt)
+                        .align_x(Horizontal::Right),
+                        container(
+                            text(&txn.running_balance_str)
+                                .size(11)
+                                .color(bal_color)
+                                .align_x(Horizontal::Right),
+                        )
+                        .width(w_bal)
                         .align_x(Horizontal::Right),
                     ]
                     .spacing(6)

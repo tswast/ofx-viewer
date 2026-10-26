@@ -17,7 +17,12 @@ pub fn fmt_dec(d: Decimal) -> String {
     let abs = d.abs();
     let s = format!("{abs:.2}");
     let (integer, decimal) = s.split_once('.').unwrap_or((&s, "00"));
-    format!("${}.{decimal}", thousands(integer))
+    let formatted = thousands(integer);
+    if d.is_sign_negative() {
+        format!("-${formatted}.{decimal}")
+    } else {
+        format!("${formatted}.{decimal}")
+    }
 }
 
 fn thousands(s: &str) -> String {

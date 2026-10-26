@@ -31,7 +31,8 @@ pub fn build_accounts(doc: &ofx_rs::OfxDocument) -> Vec<AccountView> {
             if let Some(s) = w.response() {
                 let a = s.bank_account();
                 let tl = s.transaction_list();
-                let txns = extract_txns(tl);
+                let ledger_balance = s.ledger_balance().map(|b| b.amount().as_decimal()).unwrap_or(Decimal::ZERO);
+                let txns = extract_txns(tl, ledger_balance);
                 let (tc, td) = totals(&txns);
                 out.push(AccountView {
                     label: format!("{:?}", a.account_type()),
@@ -72,7 +73,8 @@ pub fn build_accounts(doc: &ofx_rs::OfxDocument) -> Vec<AccountView> {
             if let Some(s) = w.response() {
                 let a = s.credit_card_account();
                 let tl = s.transaction_list();
-                let txns = extract_txns(tl);
+                let ledger_balance = s.ledger_balance().map(|b| b.amount().as_decimal()).unwrap_or(Decimal::ZERO);
+                let txns = extract_txns(tl, ledger_balance);
                 let (tc, td) = totals(&txns);
                 out.push(AccountView {
                     label: "Credit Card".into(),
@@ -113,7 +115,9 @@ pub fn build_accounts(doc: &ofx_rs::OfxDocument) -> Vec<AccountView> {
             if let Some(s) = w.response() {
                 let a = s.investment_account();
                 let tl = s.transaction_list();
-                let txns = extract_txns(tl);
+                // Investment accounts do not have a standard ledger balance in the same way,
+                // but we default to ZERO if not available.
+                let txns = extract_txns(tl, Decimal::ZERO);
                 let (tc, td) = totals(&txns);
                 out.push(AccountView {
                     label: "Investment".into(),
@@ -158,11 +162,11 @@ fn extract_balance_list(balances: &[ofx_rs::aggregates::Balance]) -> Vec<Balance
         .collect()
 }
 
-fn extract_txns(tl: Option<&ofx_rs::aggregates::TransactionList>) -> Vec<TxnRow> {
+fn extract_txns(tl: Option<&ofx_rs::aggregates::TransactionList>, mut current_balance: Decimal) -> Vec<TxnRow> {
     let Some(tl) = tl else {
         return vec![];
     };
-    tl.transactions()
+    let mut txns: Vec<TxnRow> = tl.transactions()
         .iter()
         .map(|t| {
             let raw = t.amount().as_decimal();
@@ -173,6 +177,8 @@ fn extract_txns(tl: Option<&ofx_rs::aggregates::TransactionList>) -> Vec<TxnRow>
                 memo: t.memo().unwrap_or("").into(),
                 amount_str: fmt_amt(t.amount()),
                 raw_amount: raw,
+                running_balance_str: String::new(),
+                raw_running_balance: Decimal::ZERO,
                 fit_id: t.fit_id().as_str().to_string(),
                 server_txn_id: t.server_transaction_id().map(|s| s.as_str().to_string()),
                 check_number: t.check_number().map(|c| c.as_str().to_string()),
@@ -193,7 +199,15 @@ fn extract_txns(tl: Option<&ofx_rs::aggregates::TransactionList>) -> Vec<TxnRow>
                 date_available: t.date_available().map(fmt_dt),
             }
         })
-        .collect()
+        .collect();
+
+    for t in txns.iter_mut().rev() {
+        t.raw_running_balance = current_balance;
+        t.running_balance_str = crate::infrastructure::fmt_dec(current_balance);
+        current_balance -= t.raw_amount;
+    }
+
+    txns
 }
 
 fn totals(txns: &[TxnRow]) -> (Decimal, Decimal) {
